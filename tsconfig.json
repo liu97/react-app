@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": "src",
     "target": "es5",
     "lib": [
       "dom",
@@ -17,7 +18,19 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react"
+    "jsx": "react",
+    "paths":{
+      // "@components/*":["components/*"],
+      // "@containers/*":["containers/*"],
+      // "@constants/*":["constants/*"],
+      // "@pages/*":["pages/*"],
+      // "@common/*":["common/*"],
+      // "@utils/*":["utils/*"],
+      // "@api/*":["api/*"],
+      // "@actions/*":["actions/*"],
+      // "@reducers/*":["reducers/*"]
+      "@/*": ["./*"],
+    }
   },
   "include": [
     "src"
