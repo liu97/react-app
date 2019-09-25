@@ -20,16 +20,7 @@
     "noEmit": true,
     "jsx": "react",
     "paths":{
-      // "@components/*":["components/*"],
-      // "@containers/*":["containers/*"],
-      // "@constants/*":["constants/*"],
-      // "@pages/*":["pages/*"],
-      // "@common/*":["common/*"],
-      // "@utils/*":["utils/*"],
-      // "@api/*":["api/*"],
-      // "@actions/*":["actions/*"],
-      // "@reducers/*":["reducers/*"]
-      "@/*": ["./*"],
+      "@/*": ["./*"]
     }
   },
   "include": [

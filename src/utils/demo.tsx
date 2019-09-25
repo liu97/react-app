@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { withRouter, RouteComponentProps } from 'react-router-dom';
+import { withRouter } from 'react-router-dom';
 
 interface IState {
     [key: string]: any,
@@ -9,14 +9,12 @@ interface IProps {
     [key: string]: any,
 }
 
-type TDemoProps = IProps & RouteComponentProps
-
-class Demo extends Component<TDemoProps, IState> {
+class Demo extends Component<IProps, IState> {
     readonly state: Readonly<IState> = {
         username: '',
         password: '',
     }
-    timer = 1
+    private refDiv = React.createRef<HTMLDivElement>()
 
     componentDidMount() {
 
@@ -29,7 +27,7 @@ class Demo extends Component<TDemoProps, IState> {
     render() {
         let props = this.props;
         return (
-            <div>{props.children}</div>
+            <div ref={this.refDiv}>{props.children}</div>
         )
     }
 }
