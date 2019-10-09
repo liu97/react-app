@@ -15,7 +15,7 @@ export const contains = (root: Node, n: Node) => {
 }
 
 export const getStyles = function (elem: HTMLElement) {
-    var view = elem && elem.ownerDocument && elem.ownerDocument.defaultView;
+    var view: any = elem && elem.ownerDocument && elem.ownerDocument.defaultView;
     if (!view || !view.opener) {
         view = window;
     }
@@ -25,8 +25,8 @@ export const getStyles = function (elem: HTMLElement) {
 export const getSize = (elem: HTMLElement) => {
     let getNoneNode = function (node: HTMLElement | null) {
         if (node) {
-            var display = getStyles(node).getPropertyValue('display'),
-                tagName = node.nodeName.toLowerCase();
+            var display: string = getStyles(node).getPropertyValue('display'),
+                tagName: string = node.nodeName.toLowerCase();
             if (display != 'none'
                 && tagName != 'body') {
                 getNoneNode(node.parentNode as HTMLElement);
@@ -60,8 +60,8 @@ export const getSize = (elem: HTMLElement) => {
             noneNodes[i].style.display = nodeStyle[i].display;
         }
     }
-    let width,
-        height,
+    let width: number,
+        height: number,
         // elem = document.getElementById(id),
         noneNodes: HTMLElement[] = [],
         nodeStyle: INodeStyle[] = [];

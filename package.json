@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "array-to-tree": "^3.3.0",
+    "chinese-name": "^0.3.0",
     "js-cookie": "^2.2.1",
+    "lodash": "^4.17.15",
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
     "react-redux": "^7.1.1",
@@ -92,6 +95,7 @@
     "@svgr/webpack": "4.3.2",
     "@types/jest": "24.0.18",
     "@types/js-cookie": "^2.2.2",
+    "@types/lodash": "^4.14.141",
     "@types/node": "12.7.2",
     "@types/react": "16.9.2",
     "@types/react-dom": "16.9.0",
