@@ -1,14 +1,16 @@
 interface IObj {
     [key: string]: any
 }
+declare let window: Window & { _urlDecodeFn_: (str: string) => void }
 
 import _ from 'lodash'
 import { RouteProps } from 'react-router';
+import QueryString from 'query-string';
 
 export const cnLen = (str: string) => {
-    var len = 0;
+    let len = 0;
     if (str) {
-        for (var i = 0; i < str.length; i++) {
+        for (let i = 0; i < str.length; i++) {
             if (str.charCodeAt(i) > 127 || str.charCodeAt(i) == 94) {
                 len += 2;
             } else {
@@ -19,13 +21,28 @@ export const cnLen = (str: string) => {
     return len;
 }
 
-export const addQuery = (queryObj: IObj, props: RouteProps, path: string) => {
-    let query = props.location && props.location.query || {};
-    path = path || props.location.pathname.replace(/^\//, '');
+export const addQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => {
+    let query = props.location && QueryString.parse(props.location.search) || {};
+    path = path || props.location && props.location.pathname.replace(/^\//, '');
     _.extend(query, queryObj)
 
-    query = Object.keys(query).
+    let queryString = Object.keys(query).
         map(key => query[key] ? key + '=' + query[key] : key).
+        join('&')
+
+    let url = '/' + path + '?' + queryString;
+
+    props.history.push(url);
+
+    return url;
+}
+
+
+export const updateQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => {
+    path = path || props.location && props.location.pathname.replace(/^\//, '');
+
+    let query = Object.keys(queryObj).
+        map(key => queryObj[key] ? key + '=' + queryObj[key] : key).
         join('&')
 
     let url = '/' + path + '?' + query;
@@ -35,42 +52,28 @@ export const addQuery = (queryObj: IObj, props: RouteProps, path: string) => {
     return url;
 }
 
-
-export const updateQuery = (query, props, path) => {
-    path = path || props.location.pathname.replace(/^\//, '');
-
-    query = Object.keys(query).
-        map(key => query[key] ? key + '=' + query[key] : key).
-        join('&')
-
-    let url = '/' + path + '?' + query;
-
-    props.history.push(url);
-
-    return url;
-}
-
-export const getQuery = (key, props) => {
-    let query = props.location.query || {};
+export const getQuery = (key: string, props: RouteProps & IObj) => {
+    let query = props.location && QueryString.parse(props.location.search) || {};
     return query[key];
 }
 
-export const getQueryString = (name) => {
-    var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
-    var r = window.location.search.substr(1).match(reg);
+export const getQueryString = (name: string) => {
+    let reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+    let r = window.location.search.substr(1).match(reg);
     if (r != null) return unescape(r[2]); return null;
 }
 
-export const stringifyQuery = (query) => {
+export const stringifyQuery = (queryObj: IObj) => {
 
-    query = Object.keys(query).
-        map(key => query[key] ? key + '=' + query[key] : key).
+    let query = Object.keys(queryObj).
+        map(key => queryObj[key] ? key + '=' + queryObj[key] : key).
         join('&')
 
     return query;
 }
 
-export const urldecode = (str, charset, callback) => {
+export const urldecode = (str: string, charset: string, callback: (str: string) => void) => {
+
     window._urlDecodeFn_ = callback;
     const script = document.createElement('script');
     script.id = '_urlDecodeFn_';
@@ -80,15 +83,15 @@ export const urldecode = (str, charset, callback) => {
     document.body.appendChild(script);
 }
 
-export const openQuery = (queryObj, props, path) => {
-    let query = props.location.query || {};
-    path = path || props.location.pathname.replace(/^\//, '');
+export const openQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => {
+    let query = props.location && QueryString.parse(props.location.search) || {};
+    path = path || props.location && props.location.pathname.replace(/^\//, '');
     _.extend(query, queryObj)
 
-    query = Object.keys(query).
+    let queryString = Object.keys(query).
         map(key => query[key] ? key + '=' + query[key] : key).
         join('&')
 
-    let url = '/#/' + path + '?' + query;
+    let url = '/#/' + path + '?' + queryString;
     window.open(url);
 }

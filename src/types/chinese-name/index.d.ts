@@ -1,6 +1,6 @@
 declare module 'chinese-name' {
     namespace chineseName {
-        const random: ()=>{}
+        function random(familyName?: string): string
     }
 
     export = chineseName;
