@@ -16,7 +16,8 @@
     "redux": "^4.0.4",
     "redux-thunk": "^2.3.0",
     "ts-pnp": "1.1.2",
-    "typescript": "3.5.3"
+    "typescript": "3.5.3",
+    "whatwg-fetch": "^3.0.0"
   },
   "scripts": {
     "start": "node scripts/start.js",

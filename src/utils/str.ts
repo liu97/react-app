@@ -95,3 +95,33 @@ export const openQuery = (queryObj: IObj, props: RouteProps & IObj, path?: strin
     let url = '/#/' + path + '?' + queryString;
     window.open(url);
 }
+
+export const addReplaceQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => { // 区别于addQuery，同replaceQuery
+    let query = props.location && QueryString.parse(props.location.search) || {};
+    path = path || props.location && props.location.pathname.replace(/^\//, '');
+    _.extend(query, queryObj)
+
+    let queryString = Object.keys(query).
+        map(key => query[key] ? key + '=' + query[key] : key).
+        join('&')
+
+    let url = '/' + path + '?' + queryString;
+
+    history.replaceState(null, '', `#${url}`);
+
+    return url;
+}
+
+export const replaceQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => { // 区别于updateQuery的是，replaceQuery不会添加history记录
+    path = path || props.location && props.location.pathname.replace(/^\//, '');
+
+    let query = Object.keys(queryObj).
+        map(key => queryObj[key] ? key + '=' + queryObj[key] : key).
+        join('&')
+
+    let url = '/' + path + '?' + query;
+
+    history.replaceState(null, '', `#${url}`);
+
+    return url;
+}
