@@ -1,7 +1,6 @@
 interface IObj {
     [key: string]: any
 }
-declare let window: Window & { _urlDecodeFn_: (str: string) => void }
 
 import _ from 'lodash'
 import { RouteProps } from 'react-router';
@@ -74,7 +73,7 @@ export const stringifyQuery = (queryObj: IObj) => {
 
 export const urldecode = (str: string, charset: string, callback: (str: string) => void) => {
 
-    window._urlDecodeFn_ = callback;
+    (<any>window)._urlDecodeFn_ = callback;
     const script = document.createElement('script');
     script.id = '_urlDecodeFn_';
     let src = 'data:text/javascript;charset=' + charset + ',_urlDecodeFn_("' + str + '");';
