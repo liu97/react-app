@@ -1,8 +1,10 @@
 import React, { SFC } from 'react';
 import { Route, Redirect, RouteProps } from 'react-router-dom';
 import { Location } from 'history';
-import Cookies from 'js-cookie'
+import Cookies from 'js-cookie';
 import { TOKEN_NAME } from '@/global';
+import { getCurrentPermission } from '@/components/Permission/util';
+import { ROUTE_AUTH_CONFIG } from '@/constants/routeConfig';
 
 interface IObj {
     [key: string]: any
@@ -11,10 +13,21 @@ interface IObj {
 /**
  * 返回值  1：有权限访问， 2：无权限访问， 0：未登录
  */
-const authCheck = ( location: Location ): 1 | 2 | 0 => {
-    if(!Cookies.get(TOKEN_NAME)){
+const authCheck = (location: Location): 1 | 2 | 0 => {
+    if (!Cookies.get(TOKEN_NAME)) {
         return 0;
-    }else{
+    } else {
+        for (const key of Object.keys(ROUTE_AUTH_CONFIG)) {
+            let keyReg = new RegExp(key);
+            if (keyReg.test(location.pathname)) {
+                const currentStage = getCurrentPermission(ROUTE_AUTH_CONFIG[key]);
+
+                if (currentStage != 1) {
+                    return 2;
+                }
+            }
+        }
+
         return 1;
     }
 }
