@@ -74,4 +74,4 @@ window.addEventListener('click', ()=>{
 	}
 }, true)*/
 
-export { updateLoginTime, initLoginTime, updateToken }
+export { updateLoginTime, initLoginTime, updateToken, logout }
