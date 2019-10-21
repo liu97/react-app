@@ -1,11 +1,11 @@
 import 'whatwg-fetch';
-import { createAction, handleActions, ActionFunctionAny, Action } from 'redux-actions';
+import { createAction, handleActions, ActionFunctionAny, Action, ReducerMap } from 'redux-actions';
 import { Dispatch } from 'redux';
 import Cookies from 'js-cookie';
 import _ from 'lodash';
 import md5 from 'md5';
 import { message, Modal } from 'antd';
-import { API_PREFIX, TOKEN_NAME } from '@/global';
+import { API_PREFIX, TOKEN_NAME, SSO_API } from '@/global';
 import { initLoginTime, updateToken, updateLoginTime, logout } from '../auth';
 import { urldecode } from './str';
 import { trimStringRecursion } from './obj';
@@ -24,6 +24,16 @@ interface IApi {
 interface IFetchParams {
     url: string,
     options: IObj,
+    path: string,
+}
+interface IRespnse {
+    data: any,
+    code: number,
+    [key: string]: any
+}
+interface IResponsePayload {
+    req: object,
+    res: IRespnse,
     path: string,
 }
 
@@ -96,43 +106,34 @@ function handleResponse(response: Response) {
     let contentType = response.headers.get('content-type')
     if (contentType && contentType.includes('application/json')) {
         return handleJSONResponse(response)
-    } else if (contentType && contentType.includes('text/html')) {
-        return handleTextResponse(response)
     } else {
+        return Promise.reject({
+            data: response,
+            status: response.status,
+            statusText: response.statusText,
+            err: response.statusText,
+        })
         throw new Error(`Sorry, content-type ${contentType} not supported`)
     }
 }
 
-function handleJSONResponse(response: Response): Promise<IObj> {
+function handleJSONResponse(response: Response): Promise<IRespnse> {
     return response.json()
         .then(json => {
             if (response.ok) {
                 return json
             } else {
                 return Promise.reject(Object.assign({}, json, {
+                    data: null,
                     status: response.status,
-                    statusText: response.statusText
+                    statusText: response.statusText,
+                    err: response.statusText,
                 }))
             }
         })
 }
-function handleTextResponse(response: Response): Promise<string> {
-    return response.text()
-        .then(text => {
-            if (response.ok) {
-                return text
-            } else {
-                return Promise.reject({
-                    status: response.status,
-                    statusText: response.statusText,
-                    err: text
-                })
-            }
-        })
 
-}
-
-function checkCommonCode(res: IObj, options: IObj, path: string, dispatch: Dispatch, query: IObj, oldQuery: IObj, useAlert: boolean, noMsg: boolean): IObj {
+function checkCommonCode(res: IRespnse, path: string, useAlert?: boolean, noMsg?: boolean): IRespnse {
     if (res.code != 0) {
         switch (res.code) {
             case 1000:
@@ -140,26 +141,9 @@ function checkCommonCode(res: IObj, options: IObj, path: string, dispatch: Dispa
             case 9004:
 
                 break;
-            case 9005:
-            case 9001:
-                if (getFromStorage('loginFrom', 'session') === 'sudoLogin') {
-                    Modal.confirm({
-                        title: '伪登录过期,请重新登录',
-                        content: '点击确定关闭当前窗口',
-                        onOk: () => {
-                            window.close();
-                        },
-                        okText: '确定'
-                    });
-                } else {
-                    location.hash = '#/login';
-                }
-                break;
             default:
                 let errMsg = res.msg
-                if (noMsg) {
-                    return {};
-                } else {
+                if(!noMsg){
                     if (useAlert) {
                         errMsg = errMsg.replace(/[\[\]]/g, '').replace(/,/g, '\r\n');
                         alert(errMsg);
@@ -188,7 +172,42 @@ function checkCommonCode(res: IObj, options: IObj, path: string, dispatch: Dispa
     return res;
 }
 
-const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<any>>, endAction: ActionFunctionAny<Action<any>>, isBranchFetch: boolean, useAlert: boolean, noMsg: boolean) =>
+function catchError(error: IObj) {
+    const { status } = error
+    if (status === 401) {
+        alert('请重新登录！')
+        // 线上环境，刷新页面以重定向到登录页面
+        process.env.NODE_ENV === 'production' && location.reload()
+    } else if (status === 403) {
+        alert('你缺少相关权限，部分功能无法使用')
+    }
+}
+
+const fetchToken = (respon: IObj, params: IObj) => {
+
+    let token: string = Cookies.get(TOKEN_NAME) || '';
+    let seed: string = respon.data.seed;
+    seed = seed.substring(seed.length - 8);
+    let apiObj = fetchJSONStringByPost('/user/auth');
+    let { url, options, path } = getFetchParams(apiObj);
+    options.body = options.body({
+        sign: md5(token + seed)
+    });
+
+    fetch(url, options)
+        .then(response => response.json())
+        .then((res) => checkCommonCode(res, path))
+        .then(tokenRes => {
+
+            if (params.noAction) {
+                params.callback && params.callback(tokenRes)
+            } else {
+                resendAction(params)
+            }
+        });
+}
+
+const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<any>>, endAction: ActionFunctionAny<Action<any>>, isBranchFetch?: boolean, useAlert?: boolean, noMsg?: boolean) =>
     (query: IObj, cb: (x: IObj) => void, branchKey: string) =>
         (dispatch: Dispatch) => {
             let respon: IObj;
@@ -211,22 +230,19 @@ const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<
 
             fetch(url, options)
                 .then(handleResponse)
-                .then((res) => checkCommonCode(res, options, path, dispatch, query, oldQuery, useAlert, noMsg))
+                .then((res) => checkCommonCode(res, path, useAlert, noMsg))
                 .then((resp) => {
                     respon = resp
                     dispatch(receiveFetchAction({
                         req: query,
                         res: resp,
                         path: path,
-                        fetchPath: oldQuery.fetchPath
                     }))
 
                     dispatch(endAction({ req: query, res: resp }))
 
-
                     // 令牌过期
                     if (resp.code === 9002 && SSO_API.indexOf(path) < 0) {
-
                         fetchToken(respon, {
                             origiApi, startAction, endAction, isBranchFetch,
                             query: oldQuery, cb, branchKey, dispatch
@@ -240,5 +256,77 @@ const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<
                     }
                 })
                 .catch(catchError)
-
         }
+
+export const createSimpleAjaxAction = (api: IApi, name: string, isBranchFetch?: boolean) => {
+
+    name = name.replace(/([A-Z])/g, ($0, $1) => ' ' + $1.toLowerCase());
+
+    const requestAction = createAction('request ' + name);
+    const recevieAction = createAction('receive ' + name);
+
+    return createAjaxAction(
+        api,
+        requestAction,
+        recevieAction,
+        isBranchFetch
+    );
+
+}
+
+const hasResponseError = (data: IObj) => {
+
+    if (data.code === 0) {
+        return false;
+    } else {
+        return true;
+    }
+};
+
+export const createSimpleAjaxReduce = (name: string, initState = {}, isBranchFetch?: boolean) => {
+
+    name = name.replace(/([A-Z])/g, ($0, $1) => ' ' + $1.toLowerCase());
+    return handleActions<object, IResponsePayload>({
+        ['request ' + name]: (state, action) => {
+            return { ...state, loading: true }
+        },
+        ['receive ' + name]: (state, action) => {
+            const { req, res } = action.payload
+
+            if (hasResponseError(res)) {
+                return { ...state, loading: false, hasError: true }
+            }
+            return { ...res.data, loading: false, hasError: false }
+        },
+        ['reset ' + name]: (state, action) => {
+            return initState
+        }
+    }, initState)
+}
+
+function createAjax(api: IApi, query: object, cb: (x: IRespnse) => void) {
+
+    let { url, options, path } = getFetchParams(api)
+
+    preprocessQuery(query)
+    let oldQuery = query || {};
+    query = options.body(query);
+    options.body = query;
+
+    fetch(url, options)
+        .then(handleResponse)
+        .then((res) => checkCommonCode(res, path))
+        .then((resp) => {
+            if (resp.code === 9002 && SSO_API.indexOf(path) < 0) {
+                fetchToken(resp, {
+                    noAction: true,
+                    callback: () => createAjax(api, oldQuery, cb)
+                })
+            } else {
+                cb && cb(resp)
+            }
+
+        })
+        .catch(catchError)
+
+}

@@ -4,7 +4,9 @@ const TOKEN_NAME: string = 'x-token';
 let protocol: string = location.protocol;
 let API_PREFIX: string;
 
-let APPID: string = 'xxxxxx'; // passport为各个业务线分配的专属appid 
+const SSO_API = ['/user/login', '/user/logout', '/user/auth']
+
+const APPID: string = 'xxxxxx'; // passport为各个业务线分配的专属appid 
 (<any>window).APPID = APPID;
 
 switch (process.env.NODE_ENV) {
@@ -19,4 +21,4 @@ switch (process.env.NODE_ENV) {
         break;
 }
 
-export { API_PREFIX, TOKEN_NAME, APPID }
+export { API_PREFIX, TOKEN_NAME, APPID, SSO_API }
