@@ -1,9 +1,10 @@
 import 'whatwg-fetch';
-import { createAction, handleActions, ActionFunctionAny, Action, ReducerMap } from 'redux-actions';
+import { createAction, handleActions, ActionFunctionAny, Action } from 'redux-actions';
 import { Dispatch } from 'redux';
 import Cookies from 'js-cookie';
 import _ from 'lodash';
 import md5 from 'md5';
+import QueryString from 'query-string';
 import { message, Modal } from 'antd';
 import { API_PREFIX, TOKEN_NAME, SSO_API } from '@/global';
 import { initLoginTime, updateToken, updateLoginTime, logout } from '../auth';
@@ -11,7 +12,6 @@ import { urldecode } from './str';
 import { trimStringRecursion } from './obj';
 import { saveToStorage, getFromStorage } from './storage';
 import { errorMessage } from './tip';
-import { any } from 'prop-types';
 
 interface IObj {
     [key: string]: any,
@@ -26,14 +26,24 @@ interface IFetchParams {
     options: IObj,
     path: string,
 }
-interface IRespnse {
+interface IJSONResponse {
     data: any,
     code: number,
     [key: string]: any
 }
-interface IResponsePayload {
+interface ITextResponse {
+    data: string,
+    code: number,
+    [key: string]: any
+}
+interface IStreamResponse {
+    data: Blob,
+    code: number,
+    [key: string]: any
+}
+interface IJSONResponsePayload {
     req: object,
-    res: IRespnse,
+    res: IJSONResponse,
     path: string,
 }
 
@@ -102,10 +112,24 @@ function preprocessQuery(query: IObj): void {
 
 
 function handleResponse(response: Response) {
+    if (response.ok) {
+        let contentType = response.headers.get('content-type')
+        if (contentType) {
+            if (contentType.includes('application/json')) {
+                return response.json();
+            } else if (contentType.includes('text/plain')) {
+                return response.text();
+            } else if (contentType.includes('application/octet-stream')) {
+                return response.blob();
+            }
+        }
 
-    let contentType = response.headers.get('content-type')
-    if (contentType && contentType.includes('application/json')) {
-        return handleJSONResponse(response)
+        return Promise.reject({
+            data: response,
+            status: response.status,
+            statusText: response.statusText,
+            err: `Sorry, content-type ${contentType} not supported`,
+        })
     } else {
         return Promise.reject({
             data: response,
@@ -113,27 +137,11 @@ function handleResponse(response: Response) {
             statusText: response.statusText,
             err: response.statusText,
         })
-        throw new Error(`Sorry, content-type ${contentType} not supported`)
     }
+
 }
 
-function handleJSONResponse(response: Response): Promise<IRespnse> {
-    return response.json()
-        .then(json => {
-            if (response.ok) {
-                return json
-            } else {
-                return Promise.reject(Object.assign({}, json, {
-                    data: null,
-                    status: response.status,
-                    statusText: response.statusText,
-                    err: response.statusText,
-                }))
-            }
-        })
-}
-
-function checkCommonCode(res: IRespnse, path: string, useAlert?: boolean, noMsg?: boolean): IRespnse {
+function checkCommonCode(res: IJSONResponse, path: string, useAlert?: boolean, noMsg?: boolean): IJSONResponse {
     if (res.code != 0) {
         switch (res.code) {
             case 1000:
@@ -143,7 +151,7 @@ function checkCommonCode(res: IRespnse, path: string, useAlert?: boolean, noMsg?
                 break;
             default:
                 let errMsg = res.msg
-                if(!noMsg){
+                if (!noMsg) {
                     if (useAlert) {
                         errMsg = errMsg.replace(/[\[\]]/g, '').replace(/,/g, '\r\n');
                         alert(errMsg);
@@ -183,7 +191,7 @@ function catchError(error: IObj) {
     }
 }
 
-const fetchToken = (respon: IObj, params: IObj) => {
+function fetchToken(respon: IObj, params: IObj) {
 
     let token: string = Cookies.get(TOKEN_NAME) || '';
     let seed: string = respon.data.seed;
@@ -230,7 +238,7 @@ const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<
 
             fetch(url, options)
                 .then(handleResponse)
-                .then((res) => checkCommonCode(res, path, useAlert, noMsg))
+                .then((res) => checkCommonCode(res.data, path, useAlert, noMsg))
                 .then((resp) => {
                     respon = resp
                     dispatch(receiveFetchAction({
@@ -258,7 +266,7 @@ const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<
                 .catch(catchError)
         }
 
-export const createSimpleAjaxAction = (api: IApi, name: string, isBranchFetch?: boolean) => {
+const createSimpleAjaxAction = (api: IApi, name: string, isBranchFetch?: boolean) => {
 
     name = name.replace(/([A-Z])/g, ($0, $1) => ' ' + $1.toLowerCase());
 
@@ -283,10 +291,10 @@ const hasResponseError = (data: IObj) => {
     }
 };
 
-export const createSimpleAjaxReduce = (name: string, initState = {}, isBranchFetch?: boolean) => {
+const createSimpleAjaxReduce = (name: string, initState = {}, isBranchFetch?: boolean) => {
 
     name = name.replace(/([A-Z])/g, ($0, $1) => ' ' + $1.toLowerCase());
-    return handleActions<object, IResponsePayload>({
+    return handleActions<object, IJSONResponsePayload>({
         ['request ' + name]: (state, action) => {
             return { ...state, loading: true }
         },
@@ -304,7 +312,7 @@ export const createSimpleAjaxReduce = (name: string, initState = {}, isBranchFet
     }, initState)
 }
 
-function createAjax(api: IApi, query: object, cb: (x: IRespnse) => void) {
+function createAjax(api: IApi, query: object, cb?: (x: IJSONResponse) => void) {
 
     let { url, options, path } = getFetchParams(api)
 
@@ -328,5 +336,93 @@ function createAjax(api: IApi, query: object, cb: (x: IRespnse) => void) {
 
         })
         .catch(catchError)
+}
 
+const requestDownloadFile = (url: string, query: object) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', `${API_PREFIX + url}?${QueryString.stringify(query)}`, true);
+    xhr.setRequestHeader('charset', 'UTF-8');
+    xhr.responseType = 'blob'
+    xhr.setRequestHeader('x-token', Cookies.get(TOKEN_NAME) || '');
+    xhr.onload = function () {
+        if (this.status === 200) {
+            let filename = "";
+            let disposition = xhr.getResponseHeader('Content-Disposition');
+            if (disposition && disposition.indexOf('attachment') !== -1) {
+                let filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                let matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) filename = matches[1].replace(/['"]/g, '');
+                urldecode(escape(filename), 'gbk', (str) => {
+                    filename = str;
+                    const URL = window.URL || window.webkitURL;
+                    const downloadUrl = URL.createObjectURL(this.response);
+                    if (filename) {
+                        const a = document.createElement("a");
+                        if (typeof a.download === 'undefined') {
+                            window.location.href = downloadUrl;
+                        } else {
+                            a.href = downloadUrl;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                        }
+                    } else {
+                        window.location.href = downloadUrl;
+                    }
+                    setTimeout(() => {
+                        URL.revokeObjectURL(downloadUrl);
+                    }, 100);
+                });
+            }
+        }
+    };
+    xhr.send();
+}
+
+function requestDownloadFile1(api: IApi, query: object = {}, cb?: (x: IJSONResponse) => void) {
+    let { url, options, path } = getFetchParams(api)
+    preprocessQuery(query)
+    let oldQuery = query || {};
+    query = options.body(query);
+    options.body = query;
+
+    fetch(url, options)
+        .then(handleResponse)
+        .then((res) => checkCommonCode(res, path))
+        .then((resp) => {
+            if (resp.code === 9002 && SSO_API.indexOf(path) < 0) {
+                fetchToken(resp, {
+                    noAction: true,
+                    callback: () => createAjax(api, oldQuery, cb)
+                })
+            } else {
+                cb && cb(resp)
+            }
+
+        })
+        .catch(catchError)
+
+}
+
+const fetchJSONStringByGet = (url: string) => {
+    const options = {
+        method: 'GET',
+        body: (query: object) => QueryString.stringify(query),
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    }
+    return { url, options }
+}
+
+const fetchJSONStringByPost = (url: string) => {
+
+    const options = {
+        method: 'POST',
+        body: (query: object) => window.JSON.stringify(query),
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    }
+    return { url, options }
 }
