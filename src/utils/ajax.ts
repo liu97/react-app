@@ -41,10 +41,18 @@ interface IStreamResponse {
     code: number,
     [key: string]: any
 }
-interface IJSONResponsePayload {
+interface IResponsePayload {
     req: object,
-    res: IJSONResponse,
+    res: IJSONResponse | ITextResponse,
     path: string,
+}
+interface IJsonpParams {
+    url: string,
+    data: IObj,
+    jsonp: string,
+    time?: number,
+    success?: (json: JSON) => {},
+    error?: (json: object) => {},
 }
 
 // token过期，接口层只负责通知token已经过期，具体是过期后跳转到登陆页面，
@@ -119,8 +127,6 @@ function handleResponse(response: Response) {
                 return response.json();
             } else if (contentType.includes('text/plain')) {
                 return response.text();
-            } else if (contentType.includes('application/octet-stream')) {
-                return response.blob();
             }
         }
 
@@ -191,6 +197,12 @@ function catchError(error: IObj) {
     }
 }
 
+function resendAction(failedActionObj: IObj){
+    let {origiApi, startAction, endAction, isBranchFetch, query, cb, branchKey, dispatch} = failedActionObj;
+    let failedAction = createAjaxAction(origiApi, startAction, endAction, isBranchFetch);
+    dispatch(failedAction(query, cb, branchKey))
+  }
+
 function fetchToken(respon: IObj, params: IObj) {
 
     let token: string = Cookies.get(TOKEN_NAME) || '';
@@ -218,7 +230,7 @@ function fetchToken(respon: IObj, params: IObj) {
 const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<any>>, endAction: ActionFunctionAny<Action<any>>, isBranchFetch?: boolean, useAlert?: boolean, noMsg?: boolean) =>
     (query: IObj, cb: (x: IObj) => void, branchKey: string) =>
         (dispatch: Dispatch) => {
-            let respon: IObj;
+            let originRes: IObj;
             dispatch(requestFetchActon())
             dispatch(startAction())
 
@@ -240,7 +252,7 @@ const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<
                 .then(handleResponse)
                 .then((res) => checkCommonCode(res.data, path, useAlert, noMsg))
                 .then((resp) => {
-                    respon = resp
+                    originRes = resp
                     dispatch(receiveFetchAction({
                         req: query,
                         res: resp,
@@ -251,7 +263,7 @@ const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<
 
                     // 令牌过期
                     if (resp.code === 9002 && SSO_API.indexOf(path) < 0) {
-                        fetchToken(respon, {
+                        fetchToken(originRes, {
                             origiApi, startAction, endAction, isBranchFetch,
                             query: oldQuery, cb, branchKey, dispatch
                         })
@@ -259,8 +271,8 @@ const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<
                     }
                 })
                 .then(() => {
-                    if (respon.status === 1) {
-                        cb && cb(respon)
+                    if (originRes.status === 1) {
+                        cb && cb(originRes)
                     }
                 })
                 .catch(catchError)
@@ -294,7 +306,7 @@ const hasResponseError = (data: IObj) => {
 const createSimpleAjaxReduce = (name: string, initState = {}, isBranchFetch?: boolean) => {
 
     name = name.replace(/([A-Z])/g, ($0, $1) => ' ' + $1.toLowerCase());
-    return handleActions<object, IJSONResponsePayload>({
+    return handleActions<object, IResponsePayload>({
         ['request ' + name]: (state, action) => {
             return { ...state, loading: true }
         },
@@ -338,67 +350,54 @@ function createAjax(api: IApi, query: object, cb?: (x: IJSONResponse) => void) {
         .catch(catchError)
 }
 
-const requestDownloadFile = (url: string, query: object) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', `${API_PREFIX + url}?${QueryString.stringify(query)}`, true);
-    xhr.setRequestHeader('charset', 'UTF-8');
-    xhr.responseType = 'blob'
-    xhr.setRequestHeader('x-token', Cookies.get(TOKEN_NAME) || '');
-    xhr.onload = function () {
-        if (this.status === 200) {
-            let filename = "";
-            let disposition = xhr.getResponseHeader('Content-Disposition');
-            if (disposition && disposition.indexOf('attachment') !== -1) {
-                let filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-                let matches = filenameRegex.exec(disposition);
-                if (matches != null && matches[1]) filename = matches[1].replace(/['"]/g, '');
-                urldecode(escape(filename), 'gbk', (str) => {
-                    filename = str;
-                    const URL = window.URL || window.webkitURL;
-                    const downloadUrl = URL.createObjectURL(this.response);
-                    if (filename) {
-                        const a = document.createElement("a");
-                        if (typeof a.download === 'undefined') {
-                            window.location.href = downloadUrl;
-                        } else {
-                            a.href = downloadUrl;
-                            a.download = filename;
-                            document.body.appendChild(a);
-                            a.click();
-                        }
-                    } else {
-                        window.location.href = downloadUrl;
-                    }
-                    setTimeout(() => {
-                        URL.revokeObjectURL(downloadUrl);
-                    }, 100);
-                });
-            }
-        }
-    };
-    xhr.send();
-}
-
-function requestDownloadFile1(api: IApi, query: object = {}, cb?: (x: IJSONResponse) => void) {
+function requestDownloadFile(api: IApi, query: object = {}, cb?: (x: IJSONResponse) => void) {
     let { url, options, path } = getFetchParams(api)
     preprocessQuery(query)
-    let oldQuery = query || {};
     query = options.body(query);
     options.body = query;
 
+    let originRes: Response;
+
     fetch(url, options)
-        .then(handleResponse)
-        .then((res) => checkCommonCode(res, path))
-        .then((resp) => {
-            if (resp.code === 9002 && SSO_API.indexOf(path) < 0) {
-                fetchToken(resp, {
-                    noAction: true,
-                    callback: () => createAjax(api, oldQuery, cb)
-                })
-            } else {
-                cb && cb(resp)
+        .then((response) => {
+            let contentType = response.headers.get('content-type')
+            if (contentType && contentType.includes('application/octet-stream')) {
+                return response.blob();
+            }
+        })
+        .then((respons) => {
+            let filename = 'download';
+
+            let disposition = originRes.headers.get('Content-Disposition');
+            if (disposition) {
+                let filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                let matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) {
+                    filename = matches[1].replace(/['"]/g, '');
+                }
             }
 
+            urldecode(escape(filename), 'gbk', (str) => {
+                filename = str;
+                const URL = window.URL || window.webkitURL;
+                const downloadUrl = URL.createObjectURL(respons);
+                if (filename) {
+                    const a = document.createElement("a");
+                    if (typeof a.download === 'undefined') {
+                        window.location.href = downloadUrl;
+                    } else {
+                        a.href = downloadUrl;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                    }
+                } else {
+                    window.location.href = downloadUrl;
+                }
+                setTimeout(() => {
+                    URL.revokeObjectURL(downloadUrl);
+                }, 100);
+            });
         })
         .catch(catchError)
 
@@ -426,3 +425,55 @@ const fetchJSONStringByPost = (url: string) => {
     }
     return { url, options }
 }
+
+function formatParams(data: IObj) {
+    var arr = [];
+    for (var name in data) {
+        arr.push(encodeURIComponent(name) + '=' + encodeURIComponent(data[name]));
+    };
+    // 添加一个随机数，防止缓存
+    arr.push('v=' + random());
+    return arr.join('&');
+}
+function random() {
+    return Math.floor(Math.random() * 10000 + 500);
+}
+
+//jsonp请求
+const ajaxJsonP = (params: IJsonpParams) => {
+
+    //创建script标签并加入到页面中
+    let head = document.getElementsByTagName('head')[0];
+    let callbackName = params.jsonp;
+
+    // 设置传递给后台的回调参数名
+    params.data['callback'] = callbackName;
+    let data = formatParams(params.data);
+
+    let script = document.createElement('script');
+    head.appendChild(script);
+
+    //创建jsonp回调函数
+    (window as any)[callbackName] = function (json: JSON) {
+        head.removeChild(script);
+        clearTimeout((script as any).timer);
+        (window as any)[callbackName] = null;
+        params.success && params.success(json);
+    };
+
+    //发送请求
+    script.src = params.url + '?' + data;
+
+    //为了得知此次请求是否成功，设置超时处理
+    if (params.time) {
+        (script as any).timer = setTimeout(function () {
+            (window as any)[callbackName] = null;
+            head.removeChild(script);
+            params.error && params.error({
+                message: '超时'
+            });
+        }, params.time);
+    }
+}
+
+export { createAjaxAction, createSimpleAjaxAction, createSimpleAjaxReduce, createAjax, requestDownloadFile, ajaxJsonP }
