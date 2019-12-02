@@ -3,8 +3,8 @@ import { getFromStorage } from 'utils/storage'
 /**
  * 系统当前所有的角色
  */
-const ROLE_OPTIONS = {
-    ROLE_ADMIN: 'role1', // 管理员
+enum ROLE_OPTIONS {
+    ROLE_ADMIN = 'role1', // 管理员
 }
 
 /**

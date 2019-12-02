@@ -2,14 +2,25 @@ import _ from 'lodash'
 
 import arrayToTree from 'array-to-tree';
 
-type Callback = (item: any, index: number) => any;
-interface IObj {
+interface IAnyObject {
+    [key: string]: any
+}
+interface IItemToObject<T> {
+    key: number,
+    title: T
+}
+interface IHasKeyObject {
+    key: any,
+    [key: string]: any
+}
+interface IKeyValueObject {
+    key: any,
+    value: any,
     [key: string]: any
 }
 
-export const getArr = (length: number, cb: Callback) => {
 
-
+export const getArr = <T>(length: number, cb: (index: number) => T): T[] => {
     if (!length || !cb) {
         throw new Error('length and callback is required')
     }
@@ -18,13 +29,12 @@ export const getArr = (length: number, cb: Callback) => {
     arr.length = length;
     arr.fill('')
 
-
     return arr.map((item, index) => {
-        return cb(item, index)
+        return cb(index)
     })
 }
 
-export const item2Obj = (arr: any[]) => {
+export const item2Obj = <T>(arr: T[]): IItemToObject<T>[] => {
     return arr.map((item, index) => {
         return {
             key: index,
@@ -33,15 +43,15 @@ export const item2Obj = (arr: any[]) => {
     })
 }
 
-export const addKeyTitle = (arr: IObj[], keyName: string, titleName: string) => {
+export const addKeyTitle = <T extends IAnyObject, K extends keyof T>(arr: T[], keyName: K, titleName: K) => {
     arr.forEach((item, index) => {
-        item.key = item[keyName]
-        item.title = item[titleName]
+        (<any>item).key = item[keyName]
+            (<any>item).title = item[titleName]
     })
 }
 
-export const arr2map = (arr: IObj[], key: string) => {
-    var obj: IObj = {}
+export const arr2map = <T extends IAnyObject, K extends keyof T>(arr: T[], key?: K) => {
+    let obj: IAnyObject = {}
     arr.forEach((item, index) => {
         let objKey = key === undefined ? index : item[key];
         obj[objKey] = item;
@@ -50,12 +60,12 @@ export const arr2map = (arr: IObj[], key: string) => {
     return obj;
 }
 
-export const arr2tree = (arr: IObj[], rules: IObj) => {
+export const arr2tree = (arr: IAnyObject[], rules: IAnyObject) => {
     let newArr = arr.map((item) => {
-        const parent_id_key = rules && rules.parent_id ? rules.parent_id : 'parentId'
+        const parent_id_key: string = rules && rules.parent_id ? rules.parent_id : 'parentId'
         let parentId = `${item[parent_id_key]}` === '-1' ? undefined : item[parent_id_key];
 
-        let obj: IObj;
+        let obj: IAnyObject;
         if (!rules) {
             obj = {
                 ...item,
@@ -93,11 +103,12 @@ export const notArray = (value: any[]) => {
     return !value || !value.length
 }
 
-export const findParentId = <ValueType extends string | number>(value: ValueType, arr: IObj[], targetArr: ValueType[]) => {
+export const findParentId = <T extends string | number>(value: T, arr: IAnyObject[]) => {
 
     let obj = arr2map(arr, 'id');
+    let targetArr: T[] = [];
 
-    function getParentId(findObj: IObj, key: ValueType) {
+    function getParentId(findObj: IAnyObject, key: T) {
         let item = findObj[key];
         if (item && item.parentId && item.parentId != -1) {
             targetArr.push(item.parentId);
@@ -110,7 +121,7 @@ export const findParentId = <ValueType extends string | number>(value: ValueType
     return targetArr;
 }
 
-export const arrAddIdByKey = (arr: IObj[]) => {
+export const arrAddIdByKey = (arr: IHasKeyObject[]) => {
     arr.forEach(item => {
         if (item && item.key) {
             item.id = item.key
@@ -118,7 +129,7 @@ export const arrAddIdByKey = (arr: IObj[]) => {
     })
 }
 
-export const getValueByKey = (key: any, list: IObj[]) => {
+export const getValueByKey = (key: any, list: IKeyValueObject[]) => {
     let value: any = null;
     list.forEach((item) => {
         if (item.key === key) {
@@ -128,8 +139,8 @@ export const getValueByKey = (key: any, list: IObj[]) => {
     return value
 }
 
-export const getKeyByValue = (val: any, list: IObj[]) => {
-    let key = '';
+export const getKeyByValue = (val: any, list: IKeyValueObject[]) => {
+    let key: any = null;
     list.forEach((item) => {
         if (item.value === val) {
             key = item.key
@@ -150,7 +161,7 @@ export const getKeyByValue = (val: any, list: IObj[]) => {
  * @param compareBy 对数组每项根据compareBy方法返回的值进行排序和等于的判断，不传该值则直接比较数组项
  * @return {boolean}
  */
-export const compareItems = (list1: any[], list2: any[], compareBy: (item: any)=> any) => {
+export const compareItems = (list1: any[], list2: any[], compareBy: (item: any) => any) => {
     if (list1.length !== list2.length) {
         return false
     }
