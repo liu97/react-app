@@ -1,24 +1,25 @@
 import _ from 'lodash'
 
-interface IObj {
+interface IAnyObject {
     [key: string]: any
 }
+type TSameKeyObject<T> = { [key in keyof T]?: any }
 
-export const mergeInitValue = (originObj: IObj, sourceObj: IObj, diffKeysObj: IObj) => {
+export const mergeInitValue = (originObj: IAnyObject, sourceObj: IAnyObject, diffKeysObj: IAnyObject) => {
     Object.keys(diffKeysObj).forEach(originKey => {
         originObj[originKey].initialValue = sourceObj[diffKeysObj[originKey]]
     })
 }
 
-export const getInitValue = (obj: IObj) => {
-    let valueObj: IObj = {};
+export const getInitValue = <T extends IAnyObject>(obj: T) => {
+    let valueObj: TSameKeyObject<T> = {};
     _.forIn(obj, (item, key) => {
-        valueObj[key] = item.initialValue;
+        valueObj[<keyof T>key] = item.initialValue;
     })
     return valueObj;
 }
 
-export const setInitValue = (obj: IObj, sourceObj: IObj) => {
+export const setInitValue = (obj: IAnyObject, sourceObj: IAnyObject) => {
     _.forIn(obj, (item, key) => {
         item.initialValue = sourceObj[key];
     })
@@ -38,7 +39,7 @@ export const isEmpty = (obj: any) => {
 }
 
 // 递归遍历obj把字段类型为字符串的属性都进行trim处理，此方法直接修改入参obj
-export function trimStringRecursion(obj: IObj) {
+export function trimStringRecursion(obj: IAnyObject) {
     if (isEmpty(obj)) {
         return
     }

@@ -53,7 +53,7 @@ const convertImgToBase64 = (url: string, outputDWidth: number = 50, outputDHeigh
             canvas.width = outputDHeight;
 
             ctx && ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
-            var dataURL = canvas.toDataURL(outputFormat);
+            let dataURL: string = canvas.toDataURL(outputFormat);
             resolve(dataURL);
         };
         img.src = url;

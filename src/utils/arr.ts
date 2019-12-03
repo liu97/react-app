@@ -60,7 +60,7 @@ export const arr2map = <T extends IAnyObject, K extends keyof T>(arr: T[], key?:
     return obj;
 }
 
-export const arr2tree = (arr: IAnyObject[], rules: IAnyObject) => {
+export const arr2tree = (arr: IAnyObject[], rules?: IAnyObject) => {
     let newArr = arr.map((item) => {
         const parent_id_key: string = rules && rules.parent_id ? rules.parent_id : 'parentId'
         let parentId = `${item[parent_id_key]}` === '-1' ? undefined : item[parent_id_key];

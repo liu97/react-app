@@ -1,15 +1,15 @@
-interface Icache {
+interface IAnyObject {
     [key: string]: any;
 }
 
-const cache: Icache = {};
+const cache: IAnyObject = {};
 
-function cacheSet(key: string, value: any) {
+function cacheSet(key: string | number, value: any) {
     cache[key] = value;
     return value;
 }
 
-function cacheGet(key: string) {
+function cacheGet(key: string | number) {
     return cache[key];
 }
 
