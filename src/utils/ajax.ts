@@ -67,7 +67,7 @@ interface IActionObject {
 }
 interface INoActionObject {
     noAction: boolean,
-    callback?: (obj:any)=>any,
+    callback?: (obj: any) => any,
 }
 type TAction = ActionFunctionAny<Action<any>>
 
@@ -383,6 +383,8 @@ function requestDownloadFile(api: IApi, query: IAnyObj = {}, cb?: (x: IJSONRespo
             let contentType = response.headers.get('content-type')
             if (contentType && contentType.includes('application/octet-stream')) {
                 return response.blob();
+            } else {
+                return Promise.reject();
             }
         })
         .then((respons) => {
@@ -399,7 +401,7 @@ function requestDownloadFile(api: IApi, query: IAnyObj = {}, cb?: (x: IJSONRespo
 
             urldecode(escape(filename), 'gbk', (str) => {
                 filename = str;
-                const URL = window.URL || window.webkitURL;
+                const URL = window.URL || (<any>window).webkitURL;
                 const downloadUrl = URL.createObjectURL(respons);
                 if (filename) {
                     const a = document.createElement("a");
@@ -438,7 +440,7 @@ const fetchJSONStringByPost = (url: string) => {
 
     const options = {
         method: 'POST',
-        body: (query: IAnyObj) => window.JSON.stringify(query),
+        body: (query: IAnyObj) => (<any>window).JSON.stringify(query),
         headers: {
             'Content-Type': 'application/json',
         },

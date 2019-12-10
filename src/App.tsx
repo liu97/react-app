@@ -21,7 +21,6 @@ class App extends Component<IProps, IState> {
     }
 
     render() {
-        let props = this.props;
         return (
             <div></div>
         )
