@@ -1,4 +1,4 @@
-interface IObj {
+interface IAnyObj {
     [key: string]: any
 }
 
@@ -20,7 +20,7 @@ export const cnLen = (str: string) => {
     return len;
 }
 
-export const addQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => {
+export const addQuery = (queryObj: IAnyObj, props: RouteProps & IAnyObj, path?: string) => {
     let query = props.location && QueryString.parse(props.location.search) || {};
     path = path || props.location && props.location.pathname.replace(/^\//, '');
     _.extend(query, queryObj)
@@ -37,7 +37,7 @@ export const addQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string
 }
 
 
-export const updateQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => {
+export const updateQuery = (queryObj: IAnyObj, props: RouteProps & IAnyObj, path?: string) => {
     path = path || props.location && props.location.pathname.replace(/^\//, '');
 
     let query = Object.keys(queryObj).
@@ -51,7 +51,7 @@ export const updateQuery = (queryObj: IObj, props: RouteProps & IObj, path?: str
     return url;
 }
 
-export const getQuery = (key: string, props: RouteProps & IObj) => {
+export const getQuery = (key: string, props: RouteProps & IAnyObj) => {
     let query = props.location && QueryString.parse(props.location.search) || {};
     return query[key];
 }
@@ -62,7 +62,7 @@ export const getQueryString = (name: string) => {
     if (r != null) return unescape(r[2]); return null;
 }
 
-export const stringifyQuery = (queryObj: IObj) => {
+export const stringifyQuery = (queryObj: IAnyObj) => {
 
     let query = Object.keys(queryObj).
         map(key => queryObj[key] ? key + '=' + queryObj[key] : key).
@@ -82,7 +82,7 @@ export const urldecode = (str: string, charset: string, callback: (str: string) 
     document.body.appendChild(script);
 }
 
-export const openQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => {
+export const openQuery = (queryObj: IAnyObj, props: RouteProps & IAnyObj, path?: string) => {
     let query = props.location && QueryString.parse(props.location.search) || {};
     path = path || props.location && props.location.pathname.replace(/^\//, '');
     _.extend(query, queryObj)
@@ -95,7 +95,7 @@ export const openQuery = (queryObj: IObj, props: RouteProps & IObj, path?: strin
     window.open(url);
 }
 
-export const addReplaceQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => { // 区别于addQuery，同replaceQuery
+export const addReplaceQuery = (queryObj: IAnyObj, props: RouteProps & IAnyObj, path?: string) => { // 区别于addQuery，同replaceQuery
     let query = props.location && QueryString.parse(props.location.search) || {};
     path = path || props.location && props.location.pathname.replace(/^\//, '');
     _.extend(query, queryObj)
@@ -111,7 +111,7 @@ export const addReplaceQuery = (queryObj: IObj, props: RouteProps & IObj, path?:
     return url;
 }
 
-export const replaceQuery = (queryObj: IObj, props: RouteProps & IObj, path?: string) => { // 区别于updateQuery的是，replaceQuery不会添加history记录
+export const replaceQuery = (queryObj: IAnyObj, props: RouteProps & IAnyObj, path?: string) => { // 区别于updateQuery的是，replaceQuery不会添加history记录
     path = path || props.location && props.location.pathname.replace(/^\//, '');
 
     let query = Object.keys(queryObj).

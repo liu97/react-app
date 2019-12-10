@@ -1,5 +1,5 @@
-declare type ConfigContent = React.ReactNode | string;
-declare type ConfigDuration = number | (() => void);
+type ConfigContent = React.ReactNode | string;
+type ConfigDuration = number | (() => void);
 import { message } from 'antd'
 
 export const modifySuccess = (msg: ConfigContent) => {

@@ -13,13 +13,11 @@ const getRandomNumber = (start: number, end: number) => {
  * @return   {Array}                          
  *
  */
-export const nameArr = (length = 100, postfix = '') => {
+export const nameArr = (length: number = 100, postfix: string = '') => {
 
-    return getArr(length, (item) => {
+    return getArr(length, (index) => {
         return ChineseName.random() + postfix;
     })
-
-
 }
 
 /**
@@ -31,17 +29,17 @@ export const nameArr = (length = 100, postfix = '') => {
  * @return   {Array}                         
  *
  */
-export const fractionArr = (length = 20, start = 2, end = 10, postfix = '') => {
-    return getArr(length, (item, index) => {
+export const fractionArr = (length: number = 20, start: number = 2, end: number = 10, postfix: string = '') => {
+    return getArr(length, (index) => {
         let denominator = getRandomNumber(start, end);
         let numerator = getRandomNumber(1, denominator);
         return numerator + '/' + denominator + postfix;
     })
 }
 
-export const enumArr = (enumValues = [], length = 50) => {
+export const enumArr = (enumValues: any[] = [], length: number = 50) => {
     let totalLength = enumValues.length;
-    return getArr(length, (item, index) => {
+    return getArr(length, (index) => {
         return enumValues[getRandomNumber(0, totalLength)];
     })
 }

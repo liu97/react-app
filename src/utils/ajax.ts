@@ -1,6 +1,7 @@
 import 'whatwg-fetch';
 import { createAction, handleActions, ActionFunctionAny, Action } from 'redux-actions';
-import { Dispatch } from 'redux';
+import { ThunkDispatch } from 'redux-thunk';
+import { AnyAction } from 'redux';
 import Cookies from 'js-cookie';
 import _ from 'lodash';
 import md5 from 'md5';
@@ -13,17 +14,17 @@ import { trimStringRecursion } from './obj';
 import { saveToStorage, getFromStorage } from './storage';
 import { errorMessage } from './tip';
 
-interface IObj {
+interface IAnyObj {
     [key: string]: any,
 }
 interface IApi {
-    options: IObj,
+    options: IAnyObj,
     url: string,
     [key: string]: any,
 }
 interface IFetchParams {
     url: string,
-    options: IObj,
+    options: IAnyObj,
     path: string,
 }
 interface IJSONResponse {
@@ -42,18 +43,33 @@ interface IStreamResponse {
     [key: string]: any
 }
 interface IResponsePayload {
-    req: object,
+    req: IAnyObj,
     res: IJSONResponse | ITextResponse,
     path: string,
 }
 interface IJsonpParams {
     url: string,
-    data: IObj,
+    data: IAnyObj,
     jsonp: string,
     time?: number,
     success?: (json: JSON) => {},
-    error?: (json: object) => {},
+    error?: (json: IAnyObj) => {},
 }
+interface IActionObject {
+    origiApi: IApi,
+    startAction: TAction,
+    endAction: TAction,
+    isBranchFetch?: boolean,
+    query: IAnyObj,
+    cb?: (x: IAnyObj) => any,
+    branchKey?: string,
+    dispatch: ThunkDispatch<{}, {}, AnyAction>,
+}
+interface INoActionObject {
+    noAction: boolean,
+    callback?: (obj:any)=>any,
+}
+type TAction = ActionFunctionAny<Action<any>>
 
 // token过期，接口层只负责通知token已经过期，具体是过期后跳转到登陆页面，
 // 还是重新获取token由业务层自己处理
@@ -114,7 +130,7 @@ function getFetchParams(api: IApi, ignoreAccountValidation?: boolean): IFetchPar
  * 请求发送前的提交参数预处理，例如：trim字符串等等
  * @param query 请求体
  */
-function preprocessQuery(query: IObj): void {
+function preprocessQuery(query: IAnyObj): void {
     trimStringRecursion(query)
 }
 
@@ -186,7 +202,7 @@ function checkCommonCode(res: IJSONResponse, path: string, useAlert?: boolean, n
     return res;
 }
 
-function catchError(error: IObj) {
+function catchError(error: IAnyObj) {
     const { status } = error
     if (status === 401) {
         alert('请重新登录！')
@@ -197,13 +213,16 @@ function catchError(error: IObj) {
     }
 }
 
-function resendAction(failedActionObj: IObj){
-    let {origiApi, startAction, endAction, isBranchFetch, query, cb, branchKey, dispatch} = failedActionObj;
+function resendAction(failedActionObj: IActionObject) {
+    let { origiApi, startAction, endAction, isBranchFetch, query, cb, branchKey, dispatch } = failedActionObj;
     let failedAction = createAjaxAction(origiApi, startAction, endAction, isBranchFetch);
     dispatch(failedAction(query, cb, branchKey))
-  }
+}
 
-function fetchToken(respon: IObj, params: IObj) {
+function isIActionObject(params: IActionObject | INoActionObject): params is INoActionObject {
+    return (<INoActionObject>params).noAction !== undefined
+}
+function fetchToken(respon: IAnyObj, params: IActionObject | INoActionObject) {
 
     let token: string = Cookies.get(TOKEN_NAME) || '';
     let seed: string = respon.data.seed;
@@ -219,7 +238,7 @@ function fetchToken(respon: IObj, params: IObj) {
         .then((res) => checkCommonCode(res, path))
         .then(tokenRes => {
 
-            if (params.noAction) {
+            if (isIActionObject(params)) {
                 params.callback && params.callback(tokenRes)
             } else {
                 resendAction(params)
@@ -227,10 +246,10 @@ function fetchToken(respon: IObj, params: IObj) {
         });
 }
 
-const createAjaxAction = (origiApi: IApi, startAction: ActionFunctionAny<Action<any>>, endAction: ActionFunctionAny<Action<any>>, isBranchFetch?: boolean, useAlert?: boolean, noMsg?: boolean) =>
-    (query: IObj, cb: (x: IObj) => void, branchKey: string) =>
-        (dispatch: Dispatch) => {
-            let originRes: IObj;
+const createAjaxAction = (origiApi: IApi, startAction: TAction, endAction: TAction, isBranchFetch?: boolean, useAlert?: boolean, noMsg?: boolean) =>
+    (query: IAnyObj, cb?: (x: IAnyObj) => void, branchKey?: string) =>
+        (dispatch: ThunkDispatch<{}, {}, AnyAction>) => {
+            let originRes: IAnyObj;
             dispatch(requestFetchActon())
             dispatch(startAction())
 
@@ -294,7 +313,8 @@ const createSimpleAjaxAction = (api: IApi, name: string, isBranchFetch?: boolean
 
 }
 
-const hasResponseError = (data: IObj) => {
+
+const hasResponseError = (data: IAnyObj) => {
 
     if (data.code === 0) {
         return false;
@@ -306,7 +326,7 @@ const hasResponseError = (data: IObj) => {
 const createSimpleAjaxReduce = (name: string, initState = {}, isBranchFetch?: boolean) => {
 
     name = name.replace(/([A-Z])/g, ($0, $1) => ' ' + $1.toLowerCase());
-    return handleActions<object, IResponsePayload>({
+    return handleActions<IAnyObj, IResponsePayload>({
         ['request ' + name]: (state, action) => {
             return { ...state, loading: true }
         },
@@ -324,7 +344,7 @@ const createSimpleAjaxReduce = (name: string, initState = {}, isBranchFetch?: bo
     }, initState)
 }
 
-function createAjax(api: IApi, query: object, cb?: (x: IJSONResponse) => void) {
+function createAjax(api: IApi, query: IAnyObj, cb?: (x: IJSONResponse) => void) {
 
     let { url, options, path } = getFetchParams(api)
 
@@ -350,7 +370,7 @@ function createAjax(api: IApi, query: object, cb?: (x: IJSONResponse) => void) {
         .catch(catchError)
 }
 
-function requestDownloadFile(api: IApi, query: object = {}, cb?: (x: IJSONResponse) => void) {
+function requestDownloadFile(api: IApi, query: IAnyObj = {}, cb?: (x: IJSONResponse) => void) {
     let { url, options, path } = getFetchParams(api)
     preprocessQuery(query)
     query = options.body(query);
@@ -406,7 +426,7 @@ function requestDownloadFile(api: IApi, query: object = {}, cb?: (x: IJSONRespon
 const fetchJSONStringByGet = (url: string) => {
     const options = {
         method: 'GET',
-        body: (query: object) => QueryString.stringify(query),
+        body: (query: IAnyObj) => QueryString.stringify(query),
         headers: {
             'Content-Type': 'application/json',
         },
@@ -418,7 +438,7 @@ const fetchJSONStringByPost = (url: string) => {
 
     const options = {
         method: 'POST',
-        body: (query: object) => window.JSON.stringify(query),
+        body: (query: IAnyObj) => window.JSON.stringify(query),
         headers: {
             'Content-Type': 'application/json',
         },
@@ -426,7 +446,7 @@ const fetchJSONStringByPost = (url: string) => {
     return { url, options }
 }
 
-function formatParams(data: IObj) {
+function formatParams(data: IAnyObj) {
     var arr = [];
     for (var name in data) {
         arr.push(encodeURIComponent(name) + '=' + encodeURIComponent(data[name]));
@@ -476,4 +496,4 @@ const ajaxJsonP = (params: IJsonpParams) => {
     }
 }
 
-export { createAjaxAction, createSimpleAjaxAction, createSimpleAjaxReduce, createAjax, requestDownloadFile, ajaxJsonP }
+export { createAjaxAction, createSimpleAjaxAction, createSimpleAjaxReduce, createAjax, fetchJSONStringByGet, fetchJSONStringByPost, requestDownloadFile, ajaxJsonP }
